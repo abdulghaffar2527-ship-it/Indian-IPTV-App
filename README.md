@@ -17,7 +17,7 @@ Watch 500+ live india TV channels with **IPTV Android Application**
 
 ## Credits
 
-[Channel Source](https://github.com/FunctionError/PiratesTv)
+[Channel Source](https://github.com/iptv-org/iptv)
 
 ## Feature
 

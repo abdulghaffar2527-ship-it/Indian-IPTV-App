@@ -2,7 +2,7 @@ import 'package:chewie/chewie.dart';
 import 'package:flutter/material.dart';
 import 'package:video_player/video_player.dart';
 import '../model/channel.dart';
-import 'package:wakelock/wakelock.dart'; // Add this import
+import 'package:wakelock_plus/wakelock_plus.dart';
 
 class Player extends StatefulWidget {
   final Channel channel;
@@ -50,14 +50,14 @@ class _PlayerState extends State<Player> {
     // Enable wake lock when video starts playing
     videoPlayerController.addListener(() {
       if (videoPlayerController.value.isPlaying) {
-        Wakelock.enable();
+        WakelockPlus.enable();
       }
     });
 
     // Disable wake lock when video stops
     videoPlayerController.addListener(() {
       if (!videoPlayerController.value.isPlaying) {
-        Wakelock.disable();
+        WakelockPlus.disable();
       }
     });
   }

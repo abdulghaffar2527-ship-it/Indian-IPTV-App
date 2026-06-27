@@ -16,7 +16,7 @@ class _M3UPlayerState extends State<M3UPlayer> {
       title: 'Live Tv',
       home: Scaffold(
           appBar: AppBar(
-            title: const Text('Channel List'),
+            title: const Text('Live TV'),
           ),
           body: const Home()),
     );

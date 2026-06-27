@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import '/screens/player.dart';
 import '../model/channel.dart';
+import '../model/stream_source.dart';
 import '../provider/channels_provider.dart';
 
 class Home extends StatefulWidget {
@@ -15,6 +16,8 @@ class Home extends StatefulWidget {
 class _HomeState extends State<Home> {
   List<Channel> channels = [];
   List<Channel> filteredChannels = [];
+  List<StreamSource> streamSources = [];
+  StreamSource? selectedSource;
   TextEditingController searchController = TextEditingController();
   final ChannelsProvider channelsProvider = ChannelsProvider();
   bool _isLoading = true;
@@ -23,28 +26,71 @@ class _HomeState extends State<Home> {
   @override
   void initState() {
     super.initState();
-    fetchData();
+    fetchStreamSources();
   }
 
-  Future<void> fetchData() async {
+  Future<void> fetchStreamSources() async {
     try {
-      final data = await channelsProvider.fetchM3UFile();
+      final sources = await channelsProvider.fetchStreamSources();
+      setState(() {
+        streamSources = sources;
+        _isLoading = false;
+      });
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('There was a problem loading stream categories'),
+          ),
+        );
+      }
+      setState(() => _isLoading = false);
+    }
+  }
+
+  Future<void> fetchChannels(StreamSource source) async {
+    setState(() {
+      _isLoading = true;
+      selectedSource = source;
+      searchController.clear();
+    });
+
+    try {
+      final data = await channelsProvider.fetchM3UFile(source.streamUrl);
       setState(() {
         channels = data;
         filteredChannels = data;
         _isLoading = false;
       });
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('There was a problem finding the data')));
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('There was a problem loading channels'),
+          ),
+        );
+      }
+      setState(() {
+        selectedSource = null;
+        _isLoading = false;
+      });
     }
   }
 
-  void filterChannels(String query) async {
+  void backToCategories() {
+    setState(() {
+      selectedSource = null;
+      channels = [];
+      filteredChannels = [];
+      searchController.clear();
+    });
+  }
+
+  void filterChannels(String query) {
     if (_debounceTimer != null) {
       _debounceTimer!.cancel();
     }
-    _debounceTimer = Timer(const Duration(milliseconds: 500), () async {
+    _debounceTimer = Timer(const Duration(milliseconds: 500), () {
       final filteredData = channelsProvider.filterChannels(query);
       setState(() {
         filteredChannels = filteredData;
@@ -54,20 +100,76 @@ class _HomeState extends State<Home> {
 
   @override
   void dispose() {
+    _debounceTimer?.cancel();
+    searchController.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
+    if (_isLoading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    if (selectedSource == null) {
+      return _buildCategoryList();
+    }
+
+    return _buildChannelList();
+  }
+
+  Widget _buildCategoryList() {
+    if (streamSources.isEmpty) {
+      return const Center(child: Text('No stream categories available'));
+    }
+
+    return ListView.builder(
+      padding: const EdgeInsets.all(16),
+      itemCount: streamSources.length,
+      itemBuilder: (context, index) {
+        final source = streamSources[index];
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 12),
+          child: ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              padding: const EdgeInsets.symmetric(vertical: 16),
+            ),
+            onPressed: () => fetchChannels(source),
+            child: Text(
+              source.name,
+              style: const TextStyle(fontSize: 16),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildChannelList() {
     return Column(
       children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(8, 8, 8, 0),
+          child: Row(
+            children: [
+              IconButton(
+                icon: const Icon(Icons.arrow_back),
+                onPressed: backToCategories,
+              ),
+              Expanded(
+                child: Text(
+                  selectedSource!.name,
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
+              ),
+            ],
+          ),
+        ),
         Padding(
           padding: const EdgeInsets.all(8.0),
           child: TextField(
             controller: searchController,
-            onChanged: (value) {
-              filterChannels(value);
-            },
+            onChanged: filterChannels,
             decoration: const InputDecoration(
               labelText: 'Search',
               hintText: 'Search channels...',
@@ -77,10 +179,8 @@ class _HomeState extends State<Home> {
           ),
         ),
         Expanded(
-          child: _isLoading
-              ? const Center(
-                  child: CircularProgressIndicator(),
-                )
+          child: filteredChannels.isEmpty
+              ? const Center(child: Text('No channels found'))
               : ListView.builder(
                   itemCount: filteredChannels.length,
                   itemBuilder: (context, index) {
